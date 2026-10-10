@@ -1,6 +1,6 @@
 # Dayglow: FastAPI + LangGraph
 
-Dayglow keeps its existing coastal interface and now runs its **Plan my day** action through a persistent Python planning workflow.
+Dayglow (LifeOSAgent) is an all-in-one personal dashboard. It keeps its existing coastal interface and now runs its **Plan my day** action through a persistent Python planning workflow.
 
 ## Existing website review
 

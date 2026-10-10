@@ -1,6 +1,6 @@
-import {dayglowAPI} from './api.js?v=today-calendar-2';
-const state={tasks:{work:[],home:[]},completed:new Set(),planned:false,lastPlan:null,busy:false};
-const threadId=sessionStorage.getItem('dayglow-thread')||crypto.randomUUID();
+import {dayglowAPI} from './api.js?v=today-profile-2';
+const state={tasks:{work:[],home:[]},completed:new Set(),planned:false,lastPlan:null,busy:false,copilotOpen:false};
+const threadId=crypto.randomUUID();
 sessionStorage.setItem('dayglow-thread',threadId);
 const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
 const now=new Date();
@@ -30,7 +30,7 @@ function setBusy(busy,planning=false){
  document.querySelector('.assistant .online').textContent=busy?'● Thinking…':'● Ready';
 }
 function applyPlan(plan){
- if(!plan||!Array.isArray(plan.blocks)||!Array.isArray(plan.calendar)||!Array.isArray(plan.activity))throw new Error('The agent returned an incomplete plan. Please try again.');
+ if(!plan||!Array.isArray(plan.blocks)||!Array.isArray(plan.calendar)||!Array.isArray(plan.activity))throw new Error('Your plan could not be completed. Please try again.');
  const firstPlan=!state.planned;
  state.planned=true;state.lastPlan=plan;
  updateTodaySummary(plan);
@@ -43,7 +43,7 @@ function applyPlan(plan){
   document.querySelector('#workspace-panels').animate([{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'translateY(0)'}],{duration:300,easing:'ease-out'});
  }
 }
-function failureText(error){return error.name==='TimeoutError'?'The local model took too long. It may still finish on the backend; reload to check the saved plan before trying again.':error.message}
+function failureText(error){return error.name==='TimeoutError'?'This is taking longer than expected. Please wait a moment before trying again.':error instanceof TypeError?'We couldn’t connect. Please check your connection and try again.':error.message}
 function clock(minutes){return String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0')}
 function renderSchedule(events){
  const box=document.querySelector('#schedule');box.replaceChildren();
@@ -61,19 +61,10 @@ async function loadContext(){
  try{
   const [work,home,calendar]=await Promise.all(['work','home','calendar'].map(source=>dayglowAPI.context(source)));
   state.tasks={work:work.items,home:home.items};renderTasks();renderSchedule(calendar.items);
-  document.querySelector('#activity').replaceChildren();activity('Ready to plan','Calendar, work and home data loaded from the backend');
-  document.querySelector('.sync').textContent='Sample data · connected';
+  document.querySelector('#activity').replaceChildren();activity('Ready to plan','Your calendar, work and home priorities are ready.');
   document.querySelector('.date-chip').textContent=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(now);
   document.querySelector('.calendar .card-head .muted').textContent=timezone.replaceAll('_',' ');
-  try{
-   const saved=await dayglowAPI.saved(threadId);
-   if(saved.request.date===localDate()){
-    state.completed=new Set(saved.request.completed_ids);renderTasks();
-    applyPlan({...saved,calendar:saved.context.calendar});
-    message(saved.summary);
-   }
-  }catch(error){if(error.status!==404)toast('Previous plan could not be restored. You can plan again.');}
- }catch(error){toast('Start the Dayglow backend to load your tasks.');document.querySelector('#insight').textContent='Service unavailable. Start the FastAPI backend and reload.';}
+ }catch(error){toast('Your day could not be loaded. Please try refreshing.');document.querySelector('#insight').textContent='Your schedule is temporarily unavailable. Please try again.';}
  finally{setBusy(false);}
 }
 let toastTimer;function toast(text){const el=document.querySelector('#toast');el.textContent=text;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500)}
@@ -100,7 +91,7 @@ async function planDay(){
   selectView('all');
   if(matchMedia('(max-width: 760px)').matches)requestAnimationFrame(()=>todaySummary.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}));
   return response.plan;
- }catch(error){message('Unable to plan your day. '+failureText(error));toast('Could not complete the plan. Check Ollama and try again.');throw error;}
+ }catch(error){message('Unable to plan your day. '+failureText(error));toast('Could not complete your plan. Please try again.');throw error;}
  finally{setBusy(false);}
 }
 async function send(text){
@@ -111,7 +102,7 @@ async function send(text){
   if(response.plan)applyPlan(response.plan);
   message(response.reply||response.plan?.summary||'Your copilot returned an empty response. Please try again.');
   return response;
- }catch(error){message('Unable to reach your copilot. '+failureText(error));toast('Check Ollama and try again.');}
+ }catch(error){message('Unable to reach your copilot. '+failureText(error));toast('Please try again in a moment.');}
  finally{setBusy(false);}
 }
 document.querySelector('#plan').addEventListener('click',()=>planDay().catch(()=>{}));document.addEventListener('change',e=>{if(e.target.matches('[data-id]')){e.target.checked?state.completed.add(e.target.dataset.id):state.completed.delete(e.target.dataset.id);renderTasks();toast(e.target.checked?'One less thing on your mind.':'Task moved back to your priorities.')}});document.querySelector('#chat').addEventListener('submit',e=>{e.preventDefault();const input=document.querySelector('#prompt');const value=input.value.trim();if(value){send(value);input.value=''}});document.querySelectorAll('[data-prompt]').forEach(btn=>btn.addEventListener('click',()=>send(btn.dataset.prompt)));document.querySelectorAll('[data-rec]').forEach(btn=>btn.addEventListener('click',()=>{message(btn.dataset.rec);activity('Downtime suggestion selected',btn.querySelector('b').textContent);toast('Added to your copilot conversation.')}));const titles={all:'Today, in balance.',calendar:'Make time for what matters.',work:'Your work, in focus.',home:'A little order at home.',entertainment:'Make room for you.',copilot:'Your copilot.'};
@@ -123,17 +114,37 @@ function selectView(view,updateHash=true){
  document.querySelectorAll('[data-tab]').forEach(b=>{const active=b.dataset.tab===view;b.classList.toggle('selected',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});
  document.querySelectorAll('[data-section]').forEach(s=>s.hidden=view==='all'?(s.dataset.section!=='calendar'||!state.planned):s.dataset.section!==view);
  document.querySelector('.task-grid').hidden=!['work','home'].includes(view);
- document.querySelector('.dashboard').hidden=view==='entertainment'||(view==='all'&&!state.planned);
- document.querySelector('.right-column').hidden=view!=='copilot';
+ const copilotOnToday=view==='all'&&state.copilotOpen;
+ document.body.dataset.copilotOpen=String(copilotOnToday);
+ const copilotButton=document.querySelector('#open-copilot');
+ copilotButton.hidden=view!=='all';
+ copilotButton.setAttribute('aria-expanded',String(copilotOnToday));
+ document.querySelector('.dashboard').hidden=view==='entertainment'||(view==='all'&&!state.planned&&!copilotOnToday);
+ document.querySelector('.right-column').hidden=view!=='copilot'&&!copilotOnToday;
+ document.querySelector('#copilot-panel').setAttribute('role',copilotOnToday?'dialog':'region');
  document.querySelector('.downtime').hidden=view!=='entertainment';
  document.querySelector('.calendar .card-head h2').textContent=view==='all'?'Your day at a glance':'Schedule';
  document.querySelector('#workspace-panels').setAttribute('aria-label',view==='all'?'Today':view[0].toUpperCase()+view.slice(1));
  document.querySelector('#view-title').textContent=titles[view];
- document.querySelector('.topbar>div:first-child').lastChild.textContent=view==='all'?'Today':view[0].toUpperCase()+view.slice(1);
  if(updateHash)history.replaceState(null,'','#'+(view==='all'?'today':view));
 }
+function toggleCopilot(open){
+ state.copilotOpen=open;
+ selectView(document.body.dataset.view||'all',false);
+ const target=open?document.querySelector(state.busy?'#close-copilot':'#prompt'):document.querySelector('#open-copilot');
+ target.focus({preventScroll:true});
+}
+document.querySelector('#open-copilot').addEventListener('click',()=>toggleCopilot(!state.copilotOpen));
+document.querySelector('#close-copilot').addEventListener('click',()=>toggleCopilot(false));
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&document.body.dataset.view==='all'&&state.copilotOpen){
+  event.preventDefault();toggleCopilot(false);
+ }
+});
 document.querySelectorAll('[data-view],[data-tab]').forEach(b=>b.addEventListener('click',()=>selectView(b.dataset.tab||b.dataset.view)));
-const initial=location.hash.slice(1);selectView(Object.hasOwn(titles,initial)?initial:'all',false);
+const refreshed=performance.getEntriesByType('navigation')[0]?.type==='reload';
+const initial=refreshed?'all':location.hash.slice(1);
+selectView(Object.hasOwn(titles,initial)?initial:'all',refreshed);
 renderTasks();
 renderSchedule([]);document.querySelector('#activity').replaceChildren();
 loadContext();

@@ -19,11 +19,11 @@ uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 
 Open **http://localhost:8000**. FastAPI serves both the existing frontend and its API, so no separate frontend server is required. API documentation is at **http://localhost:8000/docs**. Python 3.11 or newer is required. No API key is needed.
 
-Today initially shows the greeting and **Plan my day**. When planning finishes, Today reveals a compact summary and the calendar directly below the greeting. The previous schedule remains visible during replanning and after a failed request. On mobile, planning gently scrolls to the summary, respecting reduced-motion settings. Calendar remains available in its separate tab; Copilot shows the conversation and agent activity. Complete a task under Work/Home, then select **Replan my day** to exclude it. Reloading the same tab restores today's most recent plan, the submitted completion state, and the visible Today calendar.
+Today initially shows the greeting and **Plan my day**. When planning finishes, Today reveals a compact summary and the calendar directly below the greeting. The previous schedule remains visible during replanning and after a failed request. On mobile, planning gently scrolls to the summary, respecting reduced-motion settings. Calendar remains available in its separate tab; Copilot shows the conversation and agent activity. Complete a task under Work/Home, then select **Replan my day** to exclude it. Copilot is also available beside Plan my day on Today and opens next to the compact calendar (stacking above it on mobile). Refresh starts a new session on Today: the calendar and Copilot close, completed selections and the conversation reset, and you can plan again. Existing backend checkpoints are retained.
 
 Start the Ollama app and download `qwen3:8b` with `ollama pull qwen3:8b` before using the website's planner or Copilot. You can also test the endpoints in `/docs`: call `POST /api/agent/plan`, then `POST /api/chat` with the same UUID `thread_id` and a `message` asking about the schedule. These local model calls require no cloud API key. The existing `/api/plan` endpoint works without a running model.
 
-Model requests have a five-minute browser timeout; data reads keep a 30-second timeout. While the agent is working, planning, chat and task checkboxes are disabled to prevent duplicate requests or changes to the submitted completion state. Chat returns the model's reply and, when its planning tool executes, also updates the calendar and activity from the structured plan. Errors are shown in the conversation and controls are restored. If a browser request times out, the backend may still finish; reload to check the saved plan before retrying.
+Model requests have a five-minute browser timeout; data reads keep a 30-second timeout. While the agent is working, planning, chat and task checkboxes are disabled to prevent duplicate requests or changes to the submitted completion state. Chat returns the model's reply and, when its planning tool executes, also updates the calendar and activity from the structured plan. Errors are shown in the conversation and controls are restored. If a browser request times out, the backend may still finish; wait a moment before retrying. Refresh starts a new session; it does not cancel a request already running on the backend.
 
 ## Backend and workflow
 
@@ -50,7 +50,7 @@ flowchart LR
   Agent --- Memory[(Conversation SQLite checkpoints)]
 ```
 
-The graph retains its last request, context, plan, activity, and run count per `thread_id`. SQLite checkpoints survive server restarts. The browser keeps its session ID in `sessionStorage`; a new tab starts a new session. Each run explicitly replaces all request inputs, so a previous scenario override cannot leak into a subsequent plan. A lock serializes graph reads/writes within the single development server process.
+The graph retains its last request, context, plan, activity, and run count per `thread_id`. SQLite checkpoints survive server restarts. Each page load creates a new session ID and exposes it in `sessionStorage` for diagnostics. Planning and chat reuse that ID until the next refresh. Refresh does not automatically restore a previous plan. Each run explicitly replaces all request inputs, so a previous scenario override cannot leak into a subsequent plan. A lock serializes graph reads/writes within the single development server process.
 
 Scheduling is deliberately **rule-based**, rather than LLM-generated: earlier deadlines first, then priority, followed by first available contiguous slot. All existing calendar commitments (including the lunch break) remain fixed. The planner finds every overlapping calendar pair, reports those conflicts for human resolution, and schedules new tasks around the occupied intervals. Tasks that cannot fit before their deadline are deferred with a reason. Completed tasks are excluded. Validation checks that newly scheduled blocks do not overlap existing commitments or one another.
 
@@ -113,7 +113,7 @@ npm install
 npm run test:browser
 ```
 
-The browser test uses installed Google Chrome in headless mode. It checks the agent planning request, resulting calendar, task completion/replanning, reload recovery, follow-up chat without keyword-triggered replanning, chat-generated plans, waiting controls, plain-text message rendering, failure recovery and mobile horizontal overflow. Screenshots are saved in `screenshots/`. Set `DAYGLOW_TEST_URL` to use a separate test server and `DAYGLOW_SCREENSHOT_DIR` to change the output directory. The test works with controlled model responses; running against live Ollama takes longer. Set `DAYGLOW_BROWSER_CHANNEL=chromium` if using an installed Playwright Chromium instead of Chrome.
+The browser test uses installed Google Chrome in headless mode. It checks the agent planning request, resulting calendar, task completion/replanning, fresh-session refresh, follow-up chat without keyword-triggered replanning, chat-generated plans, waiting controls, plain-text message rendering, failure recovery and mobile horizontal overflow. Screenshots are saved in `screenshots/`. Set `DAYGLOW_TEST_URL` to use a separate test server and `DAYGLOW_SCREENSHOT_DIR` to change the output directory. The test works with controlled model responses; running against live Ollama takes longer. Set `DAYGLOW_BROWSER_CHANNEL=chromium` if using an installed Playwright Chromium instead of Chrome.
 
 ## Scope and later integration
 
@@ -122,3 +122,7 @@ This is a local learning implementation with mock connectors and deterministic p
 SQLite data is stored at `backend/data/checkpoints.sqlite` (ignored by Git). Set `DAYGLOW_DB` to another file path when needed. Use one server process for this sample. A production service should add authenticated user/session ownership and use a production database/checkpointer.
 
 The existing Sites deployment serves the earlier static prototype. This Python backend runs locally at port 8000; the hosted copy has not been replaced. Publishing this full workflow requires a Python-capable backend host and a configured frontend API URL.
+
+## Technical design
+
+The current architecture, API contracts, scheduling workflow, memory, refresh behavior and cloud deployment requirements are documented in [Dayglow Technical Design](docs/dayglow-technical-design.docx).

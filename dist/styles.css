@@ -32,3 +32,35 @@ body[data-view=all] .calendar .slot{margin-bottom:10px}
 #today-summary>span:first-child{color:#467f7d;font-size:18px;flex-shrink:0}
 body[data-view=all] .greeting{margin-bottom:20px}
 @media(max-width:760px){#today-summary{padding:13px 16px;font-size:13px}}
+
+/* Today: a compact calendar and the existing Copilot conversation. */
+.today-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;flex-shrink:0}
+.copilot-button,.copilot-close{color:#467f7d;background:#fffdf8;border:1px solid #a7beb7;border-radius:9px;padding:12px 18px;min-height:44px}
+.copilot-button:hover,.copilot-close:hover{background:#e6efeb}
+.copilot-button[aria-expanded=true]{background:#e6efeb;border-color:#467f7d}
+.copilot-close{padding:8px 12px;min-width:44px}
+#close-copilot{display:none}
+body[data-view=all] .dashboard{max-width:620px}
+body[data-view=all][data-copilot-open=true] #workspace-panels{display:block}
+body[data-view=all][data-copilot-open=true] .dashboard{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start;gap:20px;max-width:1080px}
+body[data-view=all] .right-column{display:block;min-width:0;grid-column:2}
+body[data-view=all] .activity,body[data-view=all] .assistant-intro{display:none}
+body[data-view=all][data-copilot-open=true] #close-copilot{display:inline-flex;align-items:center;justify-content:center}
+body[data-view=all][data-planned=false] .dashboard{grid-template-columns:minmax(0,420px)}
+body[data-view=all][data-planned=false] .right-column{grid-column:1}
+body[data-view=all] .assistant-body{min-height:160px}
+body[data-view=all] .calendar{min-width:0}
+body[data-view=all] .event{min-width:0;overflow-wrap:anywhere}
+body[data-view=all] .assistant>.card-head h2{margin-right:auto}
+@media(max-width:760px){
+ .today-actions{width:100%;flex-shrink:1}
+ .today-actions>button{flex:1}
+ .greeting .today-actions .plan-button{width:auto;white-space:normal}
+ body[data-view=all][data-copilot-open=true] .dashboard{grid-template-columns:minmax(0,1fr)}
+ body[data-view=all] .right-column{grid-column:1;grid-row:1}
+ body[data-view=all] #prompt{font-size:16px}
+}
+
+/* Space navigation directly below the brand, without a workspace label. */
+.sidebar nav{margin-top:24px}
+@media(max-width:760px){.sidebar nav{margin-top:0}}

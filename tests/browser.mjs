@@ -14,6 +14,17 @@ assert.equal(await page.locator('#home-tasks .task').count(),3);
 assert.equal(await page.locator('#workspace-panels').isVisible(),false);
 assert.equal(await page.locator('.demo,.sync').count(),0);
 assert.doesNotMatch(await page.locator('body').innerText(),/interactive demo|mock data|sample workspace|backend|FastAPI|Ollama/i);
+// Grouped navigation preserves the existing Home and Entertainment interactions.
+assert.deepEqual(await page.locator('.nav-heading').allTextContents(),['Your day','Focus & create','Care & reflect','Life & leisure']);
+await page.locator('button[data-view="home"]').click();
+assert.equal(await page.locator('#home-tasks').isVisible(),true);
+await page.locator('button[data-view="entertainment"]').click();
+assert.equal(await page.locator('.recommendations').isVisible(),true);
+await page.locator('[data-discuss]').first().click();
+await page.locator('button[data-view="copilot"]').click();
+assert.ok((await page.locator('.message.bot').last().textContent()).includes('A little ocean time'));
+await page.reload();
+await page.waitForFunction(()=>!document.querySelector('#plan').disabled);
 // Copilot can open before planning without creating a plan or a second chat.
 let toggleRequests=0;
 page.on('request',request=>{if(/\/api\/(chat|agent\/plan)$/.test(request.url()))toggleRequests++});
@@ -127,8 +138,10 @@ assert.equal(await page.locator('#copilot-panel').isVisible(),true);
 assert.equal(await page.locator('body').getAttribute('data-view'),'all');
 assert.equal(await page.locator('#open-copilot').getAttribute('aria-expanded'),'true');
 // Waiting on the model locks input and task changes; user text remains plain text.
+let releaseChat;
+const heldChat=new Promise(resolve=>{releaseChat=resolve});
 await page.route('**/api/chat',async route=>{
- await new Promise(resolve=>setTimeout(resolve,400));
+ await heldChat;
  await route.fulfill({json:{reply:'<b>Use the existing plan</b>',plan:null}});
 });
 await page.locator('#prompt').fill('Explain the plan');
@@ -139,6 +152,7 @@ assert.equal(await page.locator('input[data-id="w1"]').isDisabled(),true);
 await page.locator('#close-copilot').click();
 await page.locator('#open-copilot').click();
 assert.equal(await page.locator('#close-copilot').evaluate(el=>el===document.activeElement),true);
+releaseChat();
 await page.waitForFunction(()=>!document.querySelector('#plan').disabled);
 assert.ok((await page.locator('.message.bot').last().textContent()).includes('<b>Use the existing plan</b>'));
 assert.equal(await page.locator('.message.bot').last().locator('b').count(),0);

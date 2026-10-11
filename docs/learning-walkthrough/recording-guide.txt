@@ -1,0 +1,52 @@
+DAYGLOW: FIVE-MINUTE LEARNING WALKTHROUGH
+
+Images 01–08 are newly rendered images of genuine conversation excerpts, not screenshots of the original ChatGPT/Codex interface. Text is excerpted, with original prompts preserved. Image 09 is an existing browser screenshot from the application verification. Do not describe the excerpt cards as original chat screenshots.
+
+Sequence: eight chat-excerpt images (approximately 20 seconds each), application demo (80 seconds), then code walkthrough (60 seconds). Total: 5 minutes.
+
+HOW TO RECORD
+Open index.html in a browser and advance through the images. Use the narration below as your speaking notes. Then switch to the live Dayglow application and Visual Studio Code.
+
+000–020 seconds | 01-project.png | Project idea and first prototype
+I used ChatGPT to turn a personal planning idea into a visible prototype, initially called LifeOS. The goal was to combine calendar commitments, work tasks and home responsibilities.
+Exact source turn: 01a11948-3fe1-7071-8f7c-95c416caeb37
+
+020–040 seconds | 02-architecture.png | Choosing a practical architecture
+I compared React, Next.js and FastAPI, then kept the existing JavaScript interface and Python backend. This let me focus on learning the agent workflow without introducing a frontend migration.
+Exact source turn: 01a11a7f-4ae4-7710-b0f7-d9bc1f069e61
+
+040–060 seconds | 03-local-model.png | Adapting the model choice
+I initially explored an OpenAI-backed agent. To avoid paid API usage for this assignment, I switched to a local model through Ollama and first verified that Qwen3 responded on my Mac.
+Exact source turn: 01a11f3c-4eb5-7ad3-99e8-26887ebf9e9c
+
+060–080 seconds | 04-tools.png | From model responses to tool calls
+My next milestone was a calendar tool. I checked the actual tool request, the returned data and the final answer, rather than assuming a plausible response proved the agent had retrieved information.
+Exact source turn: 01a11f3f-6382-7750-aa1b-98f7a7322d79
+
+080–100 seconds | 05-state.png | Understanding state and memory
+I asked for explanations as I built. I learned to distinguish graph state, saved checkpoints and conversation history. The early exercise used temporary planner storage; the final application uses separate persistent SQLite stores.
+Exact source turn: 01a1243d-ad49-76e2-ae7b-e37b437ad6c6
+
+100–120 seconds | 06-scheduler.png | Separating reasoning from scheduling
+I learned why the model should not invent calendar times. The LangGraph workflow gathers context, detects conflicts, schedules, validates and summarizes. Python preserves commitments and defers tasks that cannot fit.
+Exact source turn: 01a1243e-be6f-7c62-9075-3c4d31c5de5a
+
+120–140 seconds | 07-integration.png | Connecting the complete application
+I connected the planning button and Copilot to FastAPI. The backend returns the model’s reply and the scheduler’s structured plan. The interface renders those blocks directly, preserving the existing design.
+Exact source turn: 01a124a7-6933-7952-a3c8-a32700782216
+
+140–160 seconds | 08-validation.png | Iterating without breaking functionality
+Finally, I refined the layout so Copilot and a narrower calendar sit beside each other. I verified backend tests, browser interactions and live Ollama planning. AI helped me build and debug, while I reviewed the behavior and learned the code.
+Exact source turn: 01a124f0-015e-7301-bf7f-28cec4b6c9d9
+
+160–240 seconds | Live product demo (or image 09 if the application is unavailable)
+Show Today, click Plan my day, explain the resulting calendar, open Copilot, ask a follow-up, then complete a task and replan. Start model processing early; local inference can take time. Explain that tasks and events use seeded data and no external calendar is modified.
+
+240–300 seconds | Code walkthrough
+Show dist/api.js for frontend requests, backend/main.py for FastAPI validation and endpoints, backend/agent_service.py for ChatOllama/create_agent/four tools, and backend/planner.py for StateGraph and scheduling rules. End with the distinction: the model selects tools and explains, while Python computes the schedule.
+
+HOW TO CAPTURE ORIGINAL CHAT SCREENSHOTS INSTEAD
+If your evaluator requires original chat screenshots, open this conversation and use Find with the exact prompts shown on images 01–08. Capture the prompt and corresponding response with Shift-Command-4 on your Mac. Source turn IDs are included in excerpts.json and on each image. The excerpt set is a walkthrough aid, not a substitute for original UI evidence.
+
+CURRENT IMPLEMENTATION
+Vanilla HTML/CSS/JavaScript + FastAPI/Uvicorn + LangChain + Ollama qwen3:8b + LangGraph scheduler + SQLite checkpoints. Early OpenAI, Next.js, Vercel and PostgreSQL discussions were options, not the final implementation.

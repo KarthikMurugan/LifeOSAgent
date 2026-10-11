@@ -1,11 +1,13 @@
-import {dayglowAPI} from './api.js?v=today-profile-2';
+import {createLife} from './life.js?v=life-sections-1';
+import {createWellness} from './wellness.js?v=life-sections-1';
+import {dayglowAPI} from './api.js?v=life-sections-1';
 const state={tasks:{work:[],home:[]},completed:new Set(),planned:false,lastPlan:null,busy:false,copilotOpen:false};
 const threadId=crypto.randomUUID();
 sessionStorage.setItem('dayglow-thread',threadId);
 const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
 const now=new Date();
 function localDate(){const today=new Date();return [today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-')}
-function planningInput(){return {thread_id:threadId,date:localDate(),timezone,completed_ids:[...state.completed]}}
+function planningInput(){const leisure=life.planningTasks();const extra=[...wellness.planningTasks(),...leisure];return {thread_id:threadId,date:localDate(),timezone,...(leisure.length?{day_end:1320}:{}),completed_ids:[...state.completed,...wellness.completedIds()],...(extra.length?{home:[...state.tasks.home,...extra]}:{})}}
 const todaySummary=document.createElement('p');todaySummary.id='today-summary';todaySummary.hidden=true;todaySummary.setAttribute('role','status');
 const summaryIcon=document.createElement('span');summaryIcon.setAttribute('aria-hidden','true');
 const summaryText=document.createElement('span');todaySummary.append(summaryIcon,summaryText);
@@ -23,6 +25,8 @@ export const agentService={
 };
 function setBusy(busy,planning=false){
  state.busy=busy;
+ wellness.setBusy(busy);
+ life.setBusy(busy);
  const button=document.querySelector('#plan');button.disabled=busy;button.setAttribute('aria-busy',String(busy));
  button.textContent=busy?(planning?'✳  Planning your day…':'✳  Working with your copilot…'):(state.planned?'✳  Replan my day':'✳  Plan my day');
  document.querySelector('#chat').setAttribute('aria-busy',String(busy));
@@ -52,7 +56,7 @@ function renderSchedule(events){
   const time=document.createElement('time');time.textContent=clock(item.start);
   const event=document.createElement('div');event.className='event '+(item.kind==='calendar'?'blue-event':item.kind==='break'?'break-event':'focus-event');
   const content=document.createElement('div');const title=document.createElement('b');title.textContent=item.title;
-  const detail=document.createElement('small');detail.textContent=clock(item.start)+'–'+clock(item.end)+' · '+(item.kind==='calendar'?'Calendar':item.kind==='break'?'Break':item.kind==='home'?'Home task':'Work task');
+  const detail=document.createElement('small');detail.textContent=clock(item.start)+'–'+clock(item.end)+' · '+(item.id.startsWith('leisure-')?'Entertainment':item.id==='wellness-walk'?'Wellness':item.kind==='calendar'?'Calendar':item.kind==='break'?'Break':item.kind==='home'?'Home task':'Work task');
   content.append(title,detail);event.append(content);row.append(time,event);box.append(row);
  }
 }
@@ -79,7 +83,7 @@ function renderTasks(){
    content.append(title,meta);label.append(input,content);box.append(label);
   }
  }
- document.querySelector('[data-view=all] small').textContent=String([...state.tasks.work,...state.tasks.home].filter(t=>!state.completed.has(t.id)).length);
+ document.querySelector('[data-view=all] small').textContent=String([...state.tasks.work,...state.tasks.home,...wellness.planningTasks(),...life.planningTasks()].filter(t=>!state.completed.has(t.id)&&!wellness.completedIds().includes(t.id)).length);
 }
 function message(text,role='bot'){const el=document.createElement('div');el.className='message '+role;el.textContent=text;const small=document.createElement('small');small.textContent=(role==='bot'?'Dayglow':'You')+' · just now';el.append(small);const box=document.querySelector('#messages');box.append(el);box.scrollTop=box.scrollHeight}
 function activity(title,detail){const item=document.createElement('div');item.className='activity-item';const icon=document.createElement('span');icon.textContent='✓';const content=document.createElement('div');const b=document.createElement('b');b.textContent=title;const p=document.createElement('p');p.textContent=detail;const small=document.createElement('small');small.textContent='Just now';content.append(b,p,small);item.append(icon,content);document.querySelector('#activity').prepend(item)}
@@ -105,12 +109,14 @@ async function send(text){
  }catch(error){message('Unable to reach your copilot. '+failureText(error));toast('Please try again in a moment.');}
  finally{setBusy(false);}
 }
-document.querySelector('#plan').addEventListener('click',()=>planDay().catch(()=>{}));document.addEventListener('change',e=>{if(e.target.matches('[data-id]')){e.target.checked?state.completed.add(e.target.dataset.id):state.completed.delete(e.target.dataset.id);renderTasks();toast(e.target.checked?'One less thing on your mind.':'Task moved back to your priorities.')}});document.querySelector('#chat').addEventListener('submit',e=>{e.preventDefault();const input=document.querySelector('#prompt');const value=input.value.trim();if(value){send(value);input.value=''}});document.querySelectorAll('[data-prompt]').forEach(btn=>btn.addEventListener('click',()=>send(btn.dataset.prompt)));document.querySelectorAll('[data-rec]').forEach(btn=>btn.addEventListener('click',()=>{message(btn.dataset.rec);activity('Downtime suggestion selected',btn.querySelector('b').textContent);toast('Added to your copilot conversation.')}));const titles={all:'Today, in balance.',calendar:'Make time for what matters.',work:'Your work, in focus.',home:'A little order at home.',entertainment:'Make room for you.',copilot:'Your copilot.'};
+document.querySelector('#plan').addEventListener('click',()=>planDay().catch(()=>{}));document.addEventListener('change',e=>{if(e.target.matches('[data-id]')){e.target.checked?state.completed.add(e.target.dataset.id):state.completed.delete(e.target.dataset.id);renderTasks();toast(e.target.checked?'One less thing on your mind.':'Task moved back to your priorities.')}});document.querySelector('#chat').addEventListener('submit',e=>{e.preventDefault();const input=document.querySelector('#prompt');const value=input.value.trim();if(value){send(value);input.value=''}});document.querySelectorAll('[data-prompt]').forEach(btn=>btn.addEventListener('click',()=>send(btn.dataset.prompt)));document.querySelectorAll('[data-rec]').forEach(btn=>btn.addEventListener('click',()=>{message(btn.dataset.rec);activity('Downtime suggestion selected',btn.querySelector('b').textContent);toast('Added to your copilot conversation.')}));const titles={all:'Today, in balance.',calendar:'Make time for what matters.',work:'Your work, in focus.',home:'A little order at home.',entertainment:'Make room for you.',copilot:'Your copilot.',wellness:'Health & wellness.',goals:'Your bigger picture.',notes:'Ideas worth keeping.',habits:'Small steps, every day.',journal:'A moment to reflect.',finance:'A little financial clarity.'};
 function selectView(view,updateHash=true){
+ wellness.show(view);
+ life.show(view);
  document.body.dataset.view=view;
  document.body.dataset.planned=String(state.planned);
  todaySummary.hidden=view!=='all'||!state.planned;
- document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false')});
+ document.querySelectorAll('button[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false')});
  document.querySelectorAll('[data-tab]').forEach(b=>{const active=b.dataset.tab===view;b.classList.toggle('selected',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});
  document.querySelectorAll('[data-section]').forEach(s=>s.hidden=view==='all'?(s.dataset.section!=='calendar'||!state.planned):s.dataset.section!==view);
  document.querySelector('.task-grid').hidden=!['work','home'].includes(view);
@@ -119,7 +125,7 @@ function selectView(view,updateHash=true){
  const copilotButton=document.querySelector('#open-copilot');
  copilotButton.hidden=view!=='all';
  copilotButton.setAttribute('aria-expanded',String(copilotOnToday));
- document.querySelector('.dashboard').hidden=view==='entertainment'||(view==='all'&&!state.planned&&!copilotOnToday);
+ document.querySelector('.dashboard').hidden=['entertainment','wellness','goals','notes','habits','journal','finance'].includes(view)||(view==='all'&&!state.planned&&!copilotOnToday);
  document.querySelector('.right-column').hidden=view!=='copilot'&&!copilotOnToday;
  document.querySelector('#copilot-panel').setAttribute('role',copilotOnToday?'dialog':'region');
  document.querySelector('.downtime').hidden=view!=='entertainment';
@@ -142,6 +148,8 @@ document.addEventListener('keydown',event=>{
  }
 });
 document.querySelectorAll('[data-view],[data-tab]').forEach(b=>b.addEventListener('click',()=>selectView(b.dataset.tab||b.dataset.view)));
+const wellness=createWellness({navigate:selectView,onChange:renderTasks,toast});
+const life=createLife({toast,onChange:renderTasks,discuss:text=>{message(text);activity('Downtime suggestion selected',text);selectView('copilot');toast('Added to your copilot conversation.')}});
 const refreshed=performance.getEntriesByType('navigation')[0]?.type==='reload';
 const initial=refreshed?'all':location.hash.slice(1);
 selectView(Object.hasOwn(titles,initial)?initial:'all',refreshed);
